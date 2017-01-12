@@ -22,4 +22,4 @@ deployment:
       - docker info
       - docker build --rm=false -t cryptocracy/dataanalysis .
       - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
-      - docker push cryptocracy/dataAnalysis
+      - docker push cryptocracy/dataanalysis
