@@ -1,7 +1,7 @@
 // const DeepstreamServer = require('deepstream.io')
 const assert = require('assert');
-const testData = require('./testBalances');
-const balances = require('../src/balances');
+// const testData = require('./testBalances');
+// const balances = require('../src/balances');
 // const client = require('../src/config');
 // const Big = require('big.js');
 
