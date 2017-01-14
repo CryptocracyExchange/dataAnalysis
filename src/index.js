@@ -1,5 +1,4 @@
 const data = require('./dataAnalysis');
-const chalk = require('chalk');
 
 if (process.env.NODE_ENV !== 'prod') {
   const express = require('express');
@@ -12,7 +11,7 @@ if (process.env.NODE_ENV !== 'prod') {
 
   const port = 3006;
   app.listen(port, () => {
-    console.log(chalk.blue(`Balances on ${port}!///////////////`));
+    console.log(chalk.blue(`DataAnalysis on ${port}!///////////////`));
   });
 }
 
