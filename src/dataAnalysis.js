@@ -5,6 +5,8 @@ const util = require('util');
 const mockData = require('../mockdata.js');
 const _ = require('lodash');
 const moment = require('moment');
+const Big = require('big');
+const cron = require('node-cron');
 
 const Provider = function (config) {
   this.isReady = false;
@@ -12,9 +14,10 @@ const Provider = function (config) {
   this._logLevel = config.logLevel !== undefined ? config.logLevel : 1;
   this._deepstreamClient = null;
   this._transactionHistory = {};
-  this._sortedData = mockData
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() )
-        .forEach((each, i) => { each.value = mockData.stockData[i]; });
+  // sort mockdata
+  this._sortedData = mockData.mockData
+        .sort((a, b) => moment(b.date).diff( moment(a.date) ))
+  this._sortedData.forEach((each, i) => { each.value = mockData.stockData[i]; });
 };
 
 util.inherits(Provider, EventEmitter);
@@ -81,51 +84,186 @@ Provider.prototype._ready = function () {
   this.emit('ready');
 };
 
+
 Provider.prototype.init = function () {
-  this._deepstreamClient.event.subscribe('getData', (data) => {  
-    const query = {
-      table: 'closed',
-      query: [
-      ['type', 'eq', 'buy']
-      // ['currFrom', 'eq', data.primaryCurrency],
-      // ['currTo', 'eq', data.secondaryCurrency]
-      ]
-    };
+  const history = this._deepstreamClient.record.getList('transactionHistory');
+  history.whenReady((list) => {
+    const closedList = list.getEntries();
 
-    const history = this._deepstreamClient.record.getList('transactionHistory');
-
-    history.whenReady((transactions) => {
-      let closedTrans = transactions.getEntries();
-      for (let i = 0; i < closedTrans.length; i++) {
-        this._deepstreamClient.record.getRecord(closedTrans[i]).whenReady((record) => {
-          console.log('rec', record.get());
-          let rec = record.get();
-
-          transactionHistory[closedTrans[i]] = rec;
-          record.discard();
-          console.log('ready', transactionHistory)
-        });
+    // for each record of currency pair periods
+    // find latest date
+    // if 
+    // this._deepstreamClient.record.getRecord(`chartData/${pair}${periodDur}`)
+  // check if last record date in each chartData list matches closedlist last transaction date
+  // if yes
+  //   fire CronJobs (15m, 30m, 1h, 2h)
+  // if no
+  //   run catchup function which starts at top of current hour, processing all til hit start of last processed period
+    const fifteen = cron.schedule('* */15 * * * *', (closedList) => {
+      const fifteenAgo = this._subtractPeriod(moment(), 15, 'minutes');
+      const BTCLTC = [];
+      const LTCDOGE = [];
+      const DOGEBTC = [];
+        // loop backwards over closed transactions
+      let shouldStop = false;
+      while ( shouldStop === false ) {
+        let i = closedList.length - 1;
+        let row = {};
+        // get snapshot of each record
+        this._deepstreamClient.record.snapshot(closedList[i], (rec) => {
+          if ( moment(rec.date).diff(fifteenAgo) >= 0 ) {
+            row.date = rec.date;
+            row.value = Big( rec.price ).div( rec.amount );
+            // sort to currency pairs
+            if ( rec.currFrom === 'BTC' && rec.currTo === 'LTC' ) {
+              BTCLTC.push(row);
+            } else if ( rec.currFrom === 'LTC' && rec.currTo === 'DOGE' ) {
+              LTCDOGE.push(row);
+            } else {
+              DOGEBTC.push(row);
+            }
+          } else {
+            shouldStop = true;
+          }
+        })
+        i--;
       }
+      this.process(BTCLTC, '15m', 'btcltc', fifteenAgo);
+      this.process(LTCDOGE, '15m', 'ltcdoge', fifteenAgo);
+      this.process(DOGEBTC, '15m', 'dogebtc', fifteenAgo);
+      },
+      true
+    ); 
 
-      this._update(history);
-    });
+    const thirty = cron.schedule('* */30 * * * *', (closedList) => {
+      const thirtyAgo = this._subtractPeriod(moment(), 30, 'minutes');
+      const BTCLTC = [];
+      const LTCDOGE = [];
+      const DOGEBTC = [];
+        // loop backwards over closed transactions
+      let shouldStop = false
+      while (shouldStop === false) {
+        let i = closedList.length - 1;
+        let row = {};
+        // get snapshot of each record
+        this._deepstreamClient.record.snapshot(closedList[i], (rec) => {
+          if ( moment(rec.date).diff(thirtyAgo) >= 0 ) {
+            row.date = rec.date;
+            row.value = Big(rec.price).div(rec.amount);
+            // sort to currency pairs
+            if ( rec.currFrom === 'BTC' && rec.currTo === 'LTC' ) {
+              BTCLTC.push(row);
+            } else if ( rec.currFrom === 'LTC' && rec.currTo === 'DOGE' ) {
+              LTCDOGE.push(row);
+            } else {
+              DOGEBTC.push(row);
+            }
+          } else {
+            shouldStop = true;
+          }
+        })
+        i--;
+      }
+      this.process(BTCLTC, '30m', 'btcltc', thirtyAgo);
+      this.process(LTCDOGE, '30m', 'ltcdoge', thirtyAgo);
+      this.process(DOGEBTC, '30m', 'dogebtc', thirtyAgo); 
+      },
+      true
+    );
 
-    this._deepstreamClient.event.emit('histData', () => {
-      this._getPeriods(this._sortedData, 15, 'minutes');
-    });
+    const hour = cron.schedule('* 0 */1 * * *', (closedList) => {
+      const hourAgo = this._subtractPeriod(moment(), 1, 'hours');
+      const BTCLTC = [];
+      const LTCDOGE = [];
+      const DOGEBTC = [];
+        // loop backwards over closed transactions
+      let shouldStop = false
+      while (shouldStop === false) {
+        let i = closedList.length - 1;
+        let row = {};
+        // get snapshot of each record
+        this._deepstreamClient.record.snapshot(closedList[i], (rec) => {
+          if ( moment(rec.date).diff(hourAgo) >= 0 ) {
+            row.date = rec.date;
+            row.value = Big(rec.price).div(rec.amount);
+            // sort to currency pairs
+            if ( rec.currFrom === 'BTC' && rec.currTo === 'LTC' ) {
+              BTCLTC.push(row);
+            } else if ( rec.currFrom === 'LTC' && rec.currTo === 'DOGE' ) {
+              LTCDOGE.push(row);
+            } else {
+              DOGEBTC.push(row);
+            }
+          } else {
+            shouldStop = true;
+          }
+        })
+        i--;
+      }
+      this.process(BTCLTC, '1h', 'btcltc', hourAgo);
+      this.process(LTCDOGE, '1h', 'ltcdoge', hourAgo);
+      this.process(DOGEBTC, '1h', 'dogebtc', hourAgo);
+      },
+      true
+    );
+
+    const twohours = cron.schedule('* 0 */2 * * *', (closedList) => {
+      const twohoursAgo = this._subtractPeriod(moment(), 2, 'hours');
+      const BTCLTC = [];
+      const LTCDOGE = [];
+      const DOGEBTC = [];
+        // loop backwards over closed transactions
+      let shouldStop = false
+      while (shouldStop === false) {
+        let i = closedList.length - 1;
+        let row = {};
+        // get snapshot of each record
+        this._deepstreamClient.record.snapshot(closedList[i], (rec) => {
+          if ( moment(rec.date).diff(twohoursAgo) >= 0 ) {
+            row.date = rec.date;
+            row.value = Big(rec.price).div(rec.amount);
+            // sort to currency pairs
+            if ( rec.currFrom === 'BTC' && rec.currTo === 'LTC' ) {
+              BTCLTC.push(row);
+            } else if ( rec.currFrom === 'LTC' && rec.currTo === 'DOGE' ) {
+              LTCDOGE.push(row);
+            } else {
+              DOGEBTC.push(row);
+            }
+          } else {
+            shouldStop = true;
+          }
+        })
+        i--;
+      }
+      this.process(BTCLTC, '2h', 'btcltc', twohoursAgo);
+      this.process(LTCDOGE, '2h', 'ltcdoge', twohoursAgo);
+      this.process(DOGEBTC, '2h', 'dogebtc', twohoursAgo);
+      },
+      true
+    );
+  })
+}
+
+Provider.prototype.process = function (array, periodDur, pair, start) {
+  const period = {};
+  period.date = start.toDate();
+  period.close = array[0].value;
+  period.open = array[array.length - 1].value;
+  period.low = this._findHighandLow(array)[0];
+  period.high = this._findHighandLow(array)[1];
+  period.volume = array.length;
+
+  this._deepstreamClient.record.getRecord(`chartData/${pair}${periodDur}`).whenReady((record) => {
+    let rec = record.get() || [];
+    record.set( 'data', rec.push(period) );
   })
 };
 
-Provider.prototype._update = (history) => {
-  history.subscribe((transactions) => {
-    console.log('newEntry', transactions);
-    //pooled into new period by starting date
-  })
-};
 
-Provider.prototype._getPeriods = function (data, amt, length) {
+Provider.prototype._getPeriods = function (data, periodDur) {
   let periodEnd = moment(data[0].date).endOf('hour').toDate();
-  let periodStart = this._subtractPeriod(periodEnd, amt, length);
+  let periodStart = this._subtractPeriod(periodEnd, periodDur[0], periodDur[1]);
   let periodData = [];
   let period = [];
   for (var i = 0; i < data.length; i++) {
@@ -137,7 +275,6 @@ Provider.prototype._getPeriods = function (data, amt, length) {
     } else {
       let perRow = {}
       perRow.date = periodStart;
-      // perRow.end = periodEnd;
       perRow.low = this._findHighandLow(period)[0];
       perRow.high = this._findHighandLow(period)[1];
       perRow.close = period[0].value;
@@ -147,7 +284,7 @@ Provider.prototype._getPeriods = function (data, amt, length) {
       period = [];
       period.push(row);
       let temp = periodStart;
-      periodStart = this._subtractPeriod(temp, amt, length);
+      periodStart = this._subtractPeriod(temp, periodDur[0], periodDur[1]);
       periodEnd = temp;
     }
   }
@@ -155,13 +292,13 @@ Provider.prototype._getPeriods = function (data, amt, length) {
 };
 
 Provider.prototype._subtractPeriod = function (time, amt, increment) {
-  return moment(time).subtract(amt, increment).toDate()
+  return time.subtract(amt, increment);
 };
 
 Provider.prototype._findHighandLow = function (array) {
   let low = array[0].value;
   let high = array[0].value;
-  for (var i = 1; i < array.length; i++) {
+  for (let i = 1; i < array.length; i++) {
     if (array[i].value < low) {
       low = array[i].value;
     } else if (array[i].value > high) {

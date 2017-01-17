@@ -19,12 +19,15 @@
   },
   "homepage": "https://github.com/cryptocracyexchange/dataanalysis#readme",
   "dependencies": {
+    "big.js": "^3.1.3",
     "chalk": "^1.1.3",
+    "cron": "^1.2.1",
     "deepstream.io-client-js": "^2.1.1",
     "express": "^4.14.0",
     "lodash": "^4.17.4",
     "moment": "^2.17.1",
-    "morgan": "^1.7.0"
+    "morgan": "^1.7.0",
+    "node-cron": "^1.1.2"
   },
   "devDependencies": {
     "deepstream.io": "^2.1.2",
