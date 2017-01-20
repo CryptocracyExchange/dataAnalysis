@@ -8,6 +8,8 @@ const moment = require('moment');
 const Big = require('big.js');
 const cron = require('node-cron');
 
+moment.locale();
+
 const Provider = function (config) {
   this.isReady = false;
   this._config = config;
@@ -34,7 +36,6 @@ Provider.prototype.log = function (message, level) {
   if (this._logLevel < level) {
     return;
   }
-
   const date = new Date();
   const time = `${date.toLocaleTimeString()}:${date.getMilliseconds()}`;
 
@@ -91,9 +92,21 @@ Provider.prototype.reboot = function() {
 
 
 Provider.prototype.init = function () {
-  let BTCLTC = [];
-  let LTCDOGE = [];
-  let DOGEBTC = [];
+  let BTCLTC5m = [];
+  let LTCDOGE5m = [];
+  let DOGEBTC5m = [];
+  let BTCLTC15m = [];
+  let LTCDOGE15m = [];
+  let DOGEBTC15m = [];
+  let BTCLTC30m = [];
+  let LTCDOGE30m = [];
+  let DOGEBTC30m = [];
+  let BTCLTC1h = [];
+  let LTCDOGE1h = [];
+  let DOGEBTC1h = [];
+  let BTCLTC2h = [];
+  let LTCDOGE2h = [];
+  let DOGEBTC2h = [];
   this._deepstreamClient.event.subscribe('closedSale', (data) => {
     console.log('//////data', data)
     if (!data) {
@@ -106,62 +119,134 @@ Provider.prototype.init = function () {
       row.value = data.price/data.amount;
       console.log('row', row)
       if ( data.currFrom === 'BTC' && data.currTo === 'LTC') {
-        BTCLTC.push(row);
+        BTCLTC5m.push(row);
+        BTCLTC15m.push(row);
+        BTCLTC30m.push(row);
+        BTCLTC1h.push(row);
+        BTCLTC2h.push(row);
       } else if ( data.currFrom === 'LTC' && data.currTo === 'DOGE') {
-        LTCDOGE.push(row);
+        LTCDOGE5m.push(row);
+        LTCDOGE15m.push(row);
+        LTCDOGE30m.push(row);
+        LTCDOGE1h.push(row);
+        LTCDOGE2h.push(row);
       } else {
-        DOGEBTC.push(row);
+        DOGEBTC5m.push(row);
+        DOGEBTC15m.push(row);
+        DOGEBTC30m.push(row);
+        DOGEBTC1h.push(row);
+        DOGEBTC2h.push(row);
       }
       row = {};
     }
   })
-    // if server reboots, check if a catch up is necessary
-    // this._deepstreamClient.record.snapshot(closedList[closedList.length - 1], (lastClosed) => {
-    //   this._deepstreamClient.record.snapshot(`chartData/lastProcessed`), (lastProcessed) => {
-    //     if (moment(lastProcessed.date).diff(moment(lastClosed.date)) >= 0) {
-    //       this._catchup(lastProcessed.date, closedList);
-    //     }
-    //   }
-    // })
-
-    const two = cron.schedule('* */2 * * * *', function () {
-      let periodDur = [2, 'minutes', '2m'];
+  
+    const five = cron.schedule('0 */5 * * * *', function () {
+      let periodDur = [5, 'minutes', '5m'];
       const periodAgo = this._subtractPeriod(moment(), periodDur[0], periodDur[1]);
-      // console.log('cron trigger');
-      if (BTCLTC.length > 0) {
-        this._process(BTCLTC, periodDur[2], 'BTCLTC', periodAgo);
-        BTCLTC = [];
+      if (BTCLTC5m.length > 0) {
+        this._process(BTCLTC5m, periodDur[2], 'BTCLTC', periodAgo);
+        BTCLTC5m = [];
       }
-      if (LTCDOGE.length > 0) {
-        this._process(LTCDOGE, periodDur[2], 'LTCDOGE', periodAgo);
-        LTCDOGE = [];
+      if (LTCDOGE5m.length > 0) {
+        this._process(LTCDOGE5m, periodDur[2], 'LTCDOGE', periodAgo);
+        LTCDOGE5m = [];
       }
-      if (DOGEBTC.length > 0) {
-        this._process(DOGEBTC, periodDur[2], 'DOGEBTC', periodAgo);
-        DOGEBTC = [];
+      if (DOGEBTC5m.length > 0) {
+        this._process(DOGEBTC5m, periodDur[2], 'DOGEBTC', periodAgo);
+        DOGEBTC5m = [];
       }
-      
       // return;
     }.bind(this),
-      true
+      false
     ); 
 
-    // const fifteen = cron.schedule('* */15 * * * *', this._prepare(closedList, [15, 'minutes', '15m']),
-    //   true
-    // ); 
+    const fifteen = cron.schedule('0 */15 * * * *', function () {
+      let periodDur = [15, 'minutes', '15m'];
+      const periodAgo = this._subtractPeriod(moment(), periodDur[0], periodDur[1]);
+      if (BTCLTC15m.length > 0) {
+        this._process(BTCLTC15m, periodDur[2], 'BTCLTC', periodAgo);
+        BTCLTC15m = [];
+      }
+      if (LTCDOGE15m.length > 0) {
+        this._process(LTCDOGE15m, periodDur[2], 'LTCDOGE', periodAgo);
+        LTCDOGE15m = [];
+      }
+      if (DOGEBTC15m.length > 0) {
+        this._process(DOGEBTC15m, periodDur[2], 'DOGEBTC', periodAgo);
+        DOGEBTC15m = [];
+      }
+      // return;
+    }.bind(this),
+      false
+    ); 
 
-    // const thirty = cron.schedule('* */30 * * * *', this._prepare(closedList, [30, 'minutes', '30m']),
-    //   true
-    // );
+    const thirty = cron.schedule('0 */30 * * * *', function () {
+      let periodDur = [30, 'minutes', '30m'];
+      const periodAgo = this._subtractPeriod(moment(), periodDur[0], periodDur[1]);
+      if (BTCLTC30m.length > 0) {
+        this._process(BTCLTC30m, periodDur[2], 'BTCLTC', periodAgo);
+        BTCLTC30m = [];
+      }
+      if (LTCDOGE30m.length > 0) {
+        this._process(LTCDOGE30m, periodDur[2], 'LTCDOGE', periodAgo);
+        LTCDOGE30m = [];
+      }
+      if (DOGEBTC30m.length > 0) {
+        this._process(DOGEBTC30m, periodDur[2], 'DOGEBTC', periodAgo);
+        DOGEBTC30m = [];
+      }
+      // return;
+    }.bind(this),
+      false
+    ); 
 
-    // const hour = cron.schedule('* 0 */1 * * *', this._prepare(closedList, [1, 'hours', '1h']),
-    //   true
-    // );
+    const hour = cron.schedule('0 0 */1 * * *', function () {
+      let periodDur = [1, 'hours', '1h'];
+      const periodAgo = this._subtractPeriod(moment(), periodDur[0], periodDur[1]);
+      if (BTCLTC1h.length > 0) {
+        this._process(BTCLTC1h, periodDur[2], 'BTCLTC', periodAgo);
+        BTCLTC1h = [];
+      }
+      if (LTCDOGE1h.length > 0) {
+        this._process(LTCDOGE1h, periodDur[2], 'LTCDOGE', periodAgo);
+        LTCDOGE1h = [];
+      }
+      if (DOGEBTC1h.length > 0) {
+        this._process(DOGEBTC1h, periodDur[2], 'DOGEBTC', periodAgo);
+        DOGEBTC1h = [];
+      }
+      // return;
+    }.bind(this),
+      false
+    ); 
 
-    // const twohours = cron.schedule('* 0 */2 * * *', this._prepare(closedList, [2, 'hours', '2h']),
-    //   true
-    // );
-  // })
+    const twohour = cron.schedule('0 0 */2 * * *', function () {
+      let periodDur = [2, 'hours', '2h'];
+      const periodAgo = this._subtractPeriod(moment(), periodDur[0], periodDur[1]);
+      if (BTCLTC2h.length > 0) {
+        this._process(BTCLTC2h, periodDur[2], 'BTCLTC', periodAgo);
+        BTCLTC2h = [];
+      }
+      if (LTCDOGE2h.length > 0) {
+        this._process(LTCDOGE2h, periodDur[2], 'LTCDOGE', periodAgo);
+        LTCDOGE2h = [];
+      }
+      if (DOGEBTC2h.length > 0) {
+        this._process(DOGEBTC2h, periodDur[2], 'DOGEBTC', periodAgo);
+        DOGEBTC2h = [];
+      }
+      // return;
+    }.bind(this),
+      false
+    ); 
+
+
+    five.start();
+    fifteen.start();
+    thirty.start();
+    hour.start();
+    twohour.start();
 }
 
 
